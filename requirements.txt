@@ -3,6 +3,7 @@ tiktoken
 chromadb
 langchain
 langchain-community
+langchain-openai
 flask
 GitPython
 python-dotenv
