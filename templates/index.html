@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeInsightChat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center">
+
+    <div id="loading-overlay"
+        class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="flex flex-col items-center">
+            <svg class="animate-spin h-12 w-12 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+                viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span class="text-white text-lg font-semibold">Analyzing repository, please wait...</span>
+        </div>
+    </div>
+
+    <div class="w-full max-w-xl mt-10">
+        <h1 class="text-3xl font-bold mb-6 text-center">CodeInsightChat</h1>
+        {% if error %}
+        <div class="bg-red-100 text-red-700 px-4 py-2 rounded mb-4">{{ error }}</div>
+        {% endif %}
+        <form action="/analyze" method="post" class="flex gap-2 mb-6">
+            <input name="github_url" type="url" placeholder="Enter GitHub repo URL (e.g. https://github.com/user/repo)"
+                required class="flex-1 px-3 py-2 border rounded" {% if analyzed %}disabled{% endif %}>
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded" {% if analyzed %}disabled{% endif
+                %}>Analyze</button>
+        </form>
+        {% if analyzed|default(false) %}
+        <div class="bg-white rounded shadow p-4">
+            <div id="chat-box" class="h-64 overflow-y-auto border-b mb-4 pb-2 flex flex-col gap-2"></div>
+            <form id="chat-form" class="flex gap-2">
+                <input id="chat-input" type="text" placeholder="Ask a question about the codebase..."
+                    class="flex-1 px-3 py-2 border rounded" required autocomplete="off">
+                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Send</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+
+        window.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('loading-overlay').classList.add('hidden');
+        });
+        // Show loading overlay on Analyze submit (with slight delay)
+        const analyzeForm = document.querySelector('form[action="/analyze"]');
+        if (analyzeForm) {
+            analyzeForm.addEventListener('submit', function (e) {
+                document.getElementById('loading-overlay').classList.remove('hidden');
+                setTimeout(() => {
+                    analyzeForm.submit();
+                }, 50);
+                e.preventDefault();
+            });
+        }
+        {% if analyzed %}
+        const chatBox = document.getElementById('chat-box');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        let chatHistory = [];
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const question = chatInput.value.trim();
+            if (!question) return;
+            chatHistory.push({ role: 'user', text: question });
+            renderChat();
+            chatInput.value = '';
+            chatInput.disabled = true;
+            const res = await fetch('/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question })
+            });
+            const data = await res.json();
+            chatHistory.push({ role: 'bot', text: data.answer });
+            renderChat();
+            chatInput.disabled = false;
+            chatInput.focus();
+        });
+        function renderChat() {
+            chatBox.innerHTML = '';
+            chatHistory.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
+                div.innerHTML = `<span class="inline-block px-3 py-2 rounded ${msg.role === 'user' ? 'bg-blue-200' : 'bg-gray-200'}">${msg.text}</span>`;
+                chatBox.appendChild(div);
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        {% endif %}
+    </script>
+</body>
+
+</html>
